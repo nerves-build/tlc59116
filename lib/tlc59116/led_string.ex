@@ -1,17 +1,18 @@
 defmodule Tlc59116.LedString do
   defmodule State do
-    defstruct leds: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    defstruct leds: [],
               ref: nil,
               addr: nil,
+              last_draw: nil,
               start_time: nil
   end
 
   use GenServer
 
   require Logger
+  require Integer
 
-  @i2c_handler Application.get_env(:tlc59116, Tlc59116, [])
-               |> Keyword.get(:i2c_handler, Circuits.I2C)
+  @i2c_handler Application.get_env(:tlc59116, Tlc59116, []) |> Keyword.get(:i2c_handler, Circuits.I2C)
 
   def start_link(_vars) do
     GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
@@ -43,6 +44,7 @@ defmodule Tlc59116.LedString do
                   start_time: :os.system_time(:millisecond)
               }
               |> start_pins()
+              |> draw_all([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255])
 
             error ->
               Logger.error("Could not start LedString #{inspect(error)}")
@@ -54,12 +56,27 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call(:twinkle, _from, %{start_time: start_time} = state) do
-    elapsed_tenths = Kernel.trunc((:os.system_time(:milliseconds) - start_time) / 100)
+    elapsed_tenths = Kernel.trunc((:os.system_time(:millisecond) - start_time) / 100)
 
-    new_leds =
-      for i <- 0..15 do
-        Kernel.rem(elapsed_tenths + i, 3) * 80
-      end
+    new_leds = case Integer.is_odd(elapsed_tenths) do
+      true ->
+          for i <- 0..14 do
+            if Integer.is_odd(i) do
+              255
+            else
+              0
+            end
+          end
+
+      false ->
+          for i <- 0..14 do
+            if Integer.is_even(i) do
+              255
+            else
+              0
+            end
+          end
+    end
 
     new_state = draw_all(state, new_leds)
 
@@ -67,18 +84,18 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call({:draw_value, value, 0}, _from, state) do
-    inc = 100 / 16
+    inc = 100 / 15
     pins = Kernel.floor(value / inc)
-    IO.puts("drawing the value #{value} with fade #{0}")
 
     new_leds =
-      for i <- 0..15 do
+      for i <- 0..14 do
         if i == pins do
           20
         else
           0
         end
       end
+      |> Enum.concat([40])
 
     new_state = draw_all(state, new_leds)
 
@@ -86,16 +103,16 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call({:draw_value, value, fade}, _from, state) do
-    inc = 100 / 16
+    inc = 100 / 15
     pins = Kernel.floor(value / inc)
     rem = (value - pins * inc) / inc * 255
-    IO.puts("drawing the value #{value} with fade #{fade}")
+    val = Kernel.trunc(255 * (fade / 100.0))
 
     new_leds =
-      for i <- 0..15 do
+      for i <- 0..14 do
         cond do
           i < pins ->
-            255 * fade
+            val
 
           i > pins ->
             0
@@ -104,6 +121,7 @@ defmodule Tlc59116.LedString do
             Kernel.floor(rem)
         end
       end
+      |> Enum.concat([255])
 
     new_state = draw_all(state, new_leds)
 

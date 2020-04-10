@@ -72,6 +72,11 @@ defmodule Tlc59116.Ticker do
     {:noreply, state}
   end
 
+  defp handle_tick(%{mode: :sparkle} = state) do
+    LedString.twinkle()
+    state
+  end
+
   defp handle_tick(%{mode: :normal} = state) do
     tick_time = :os.system_time(:millisecond)
 
@@ -89,8 +94,6 @@ defmodule Tlc59116.Ticker do
          tick_time
        )
        when last_event + fade_start > tick_time do
-    IO.inspect(last_event + fade_start, label: "last_event + fade_start")
-    IO.inspect(tick_time, label: "tick_time")
     LedString.draw_value(value, 100)
   end
 
