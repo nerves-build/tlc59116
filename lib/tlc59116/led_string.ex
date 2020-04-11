@@ -47,7 +47,7 @@ defmodule Tlc59116.LedString do
                   start_time: :os.system_time(:millisecond)
               }
               |> start_pins()
-              |> draw_all([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255])
+              |> handle_draw_value(0, 100)
 
             error ->
               Logger.error("Could not start LedString #{inspect(error)}")
@@ -63,7 +63,7 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call(:twinkle, _from, %{start_time: start_time} = state) do
-    elapsed_tenths = Kernel.trunc((:os.system_time(:millisecond) - start_time) / 100)
+    elapsed_tenths = Kernel.trunc((:os.system_time(:millisecond) - start_time) / 500)
 
     new_leds =
       elapsed_tenths
@@ -77,13 +77,7 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call({:draw_value, value, fade}, _from, state) do
-    new_leds =
-      value
-      |> generate_level_params(fade)
-      |> generate_level
-      |> generate_on_lite
-
-    new_state = draw_all(state, new_leds)
+    new_state = handle_draw_value(state, value, fade)
 
     {:reply, new_state, new_state}
   end
@@ -102,6 +96,18 @@ defmodule Tlc59116.LedString do
       end
     end
   end
+
+defp handle_draw_value(state, value, fade) do
+    new_leds =
+      value
+      |> generate_level_params(fade)
+      |> generate_level
+      |> generate_on_lite
+
+    draw_all(state, new_leds)
+end
+
+  defp generate_level_params(0, 0), do: {15, 0, 0}
 
   defp generate_level_params(value, 0) do
     inc = 100 / 15

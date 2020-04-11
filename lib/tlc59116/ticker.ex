@@ -14,7 +14,7 @@ defmodule Tlc59116.Ticker do
 
   alias Tlc59116.LedString
 
-  @interval 500
+  @interval 100
   @two_hours 1000 * 60 * 60 * 2
   @three_hours 1000 * 60 * 60 * 3
   @modes [:normal, :sparkle]
