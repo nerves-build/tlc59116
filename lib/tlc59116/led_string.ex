@@ -3,6 +3,7 @@ defmodule Tlc59116.LedString do
     defstruct leds: [],
               ref: nil,
               addr: nil,
+              initialized: false,
               last_draw: nil,
               start_time: nil
   end
@@ -12,7 +13,9 @@ defmodule Tlc59116.LedString do
   require Logger
   require Integer
 
-  @i2c_handler Application.get_env(:tlc59116, Tlc59116, []) |> Keyword.get(:i2c_handler, Circuits.I2C)
+  @i2c_handler Application.get_env(:tlc59116, Tlc59116, [])
+               |> Keyword.get(:i2c_handler, Circuits.I2C)
+  @actions [:normal, :sparkle]
 
   def start_link(_vars) do
     GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
@@ -55,47 +58,18 @@ defmodule Tlc59116.LedString do
     {:ok, new_state}
   end
 
+  def handle_call(action, _from, %{initialized: false} = state) when action in @actions do
+    {:reply, state, state}
+  end
+
   def handle_call(:twinkle, _from, %{start_time: start_time} = state) do
     elapsed_tenths = Kernel.trunc((:os.system_time(:millisecond) - start_time) / 100)
 
-    new_leds = case Integer.is_odd(elapsed_tenths) do
-      true ->
-          for i <- 0..14 do
-            if Integer.is_odd(i) do
-              255
-            else
-              0
-            end
-          end
-
-      false ->
-          for i <- 0..14 do
-            if Integer.is_even(i) do
-              255
-            else
-              0
-            end
-          end
-    end
-
-    new_state = draw_all(state, new_leds)
-
-    {:reply, new_state, new_state}
-  end
-
-  def handle_call({:draw_value, value, 0}, _from, state) do
-    inc = 100 / 15
-    pins = Kernel.floor(value / inc)
-
     new_leds =
-      for i <- 0..14 do
-        if i == pins do
-          20
-        else
-          0
-        end
-      end
-      |> Enum.concat([40])
+      elapsed_tenths
+      |> Integer.is_odd()
+      |> generate_twinkle()
+      |> generate_on_lite
 
     new_state = draw_all(state, new_leds)
 
@@ -103,29 +77,45 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call({:draw_value, value, fade}, _from, state) do
+    new_leds =
+      value
+      |> generate_level_params(fade)
+      |> generate_level
+      |> generate_on_lite
+
+    new_state = draw_all(state, new_leds)
+
+    {:reply, new_state, new_state}
+  end
+
+  defp generate_level({pins, val, rem}) do
+    for i <- 0..14 do
+      cond do
+        i < pins ->
+          val
+
+        i > pins ->
+          0
+
+        true ->
+          rem
+      end
+    end
+  end
+
+  defp generate_level_params(value, 0) do
+    inc = 100 / 15
+    pins = Kernel.floor(value / inc)
+    {pins, 0, 20}
+  end
+
+  defp generate_level_params(value, fade) do
     inc = 100 / 15
     pins = Kernel.floor(value / inc)
     rem = (value - pins * inc) / inc * 255
     val = Kernel.trunc(255 * (fade / 100.0))
 
-    new_leds =
-      for i <- 0..14 do
-        cond do
-          i < pins ->
-            val
-
-          i > pins ->
-            0
-
-          true ->
-            Kernel.floor(rem)
-        end
-      end
-      |> Enum.concat([255])
-
-    new_state = draw_all(state, new_leds)
-
-    {:reply, new_state, new_state}
+    {pins, val, Kernel.floor(rem)}
   end
 
   defp draw_all(%{ref: ref, addr: addr, leds: leds} = state, new_leds) do
@@ -151,11 +141,26 @@ defmodule Tlc59116.LedString do
         :ok = @i2c_handler.write(ref, addr, <<0x15, 0xFF>>)
         :ok = @i2c_handler.write(ref, addr, <<0x16, 0xFF>>)
         :ok = @i2c_handler.write(ref, addr, <<0x17, 0xFF>>)
-        state
+        %{state | initialized: true}
 
       error ->
         Logger.error("Could not write LedString to #{inspect(error)}")
         %{state | state: :disabled}
     end
   end
+
+  defp generate_twinkle(start_on) do
+    for i <- 0..14 do
+      if should_be_on(start_on, i) do
+        255
+      else
+        0
+      end
+    end
+  end
+
+  defp should_be_on(true, i), do: Integer.is_odd(i)
+  defp should_be_on(false, i), do: Integer.is_even(i)
+
+  defp generate_on_lite(leds), do: Enum.concat(leds, [255])
 end

@@ -90,7 +90,7 @@ defmodule Tlc59116.Ticker do
   end
 
   defp handle_normal(
-         %{value: value, last_event: last_event, fade_start: fade_start} = state,
+         %{value: value, last_event: last_event, fade_start: fade_start},
          tick_time
        )
        when last_event + fade_start > tick_time do
@@ -98,8 +98,7 @@ defmodule Tlc59116.Ticker do
   end
 
   defp handle_normal(
-         %{value: value, last_event: last_event, fade_start: fade_start, fade_end: fade_end} =
-           state,
+         %{value: value, last_event: last_event, fade_start: fade_start, fade_end: fade_end},
          tick_time
        ) do
     fade_range = fade_end - fade_start
