@@ -38,21 +38,10 @@ defmodule Tlc59116.LedString do
           state
 
         addr ->
-          case @i2c_handler.open("i2c-1") do
-            {:ok, ref} ->
-              %{
-                state
-                | ref: ref,
-                  addr: addr,
-                  start_time: :os.system_time(:millisecond)
-              }
-              |> start_pins()
-              |> handle_draw_value(0, 100)
-
-            error ->
-              Logger.error("Could not start LedString #{inspect(error)}")
-              %{state | state: :disabled}
-          end
+          %{state | addr: addr}
+          |> open_handler()
+          |> start_pins()
+          |> handle_draw_value(0, 100)
       end
 
     {:ok, new_state}
@@ -82,6 +71,21 @@ defmodule Tlc59116.LedString do
     {:reply, new_state, new_state}
   end
 
+  defp open_handler(state) do
+    case @i2c_handler.open("i2c-1") do
+      {:ok, ref} ->
+        %{
+          state
+          | ref: ref,
+            start_time: :os.system_time(:millisecond)
+        }
+
+      error ->
+        Logger.error("Could not start LedString #{inspect(error)}")
+        state
+    end
+  end
+
   defp generate_level({pins, val, rem}) do
     for i <- 0..14 do
       cond do
@@ -97,7 +101,7 @@ defmodule Tlc59116.LedString do
     end
   end
 
-defp handle_draw_value(state, value, fade) do
+  defp handle_draw_value(state, value, fade) do
     new_leds =
       value
       |> generate_level_params(fade)
@@ -105,7 +109,7 @@ defp handle_draw_value(state, value, fade) do
       |> generate_on_lite
 
     draw_all(state, new_leds)
-end
+  end
 
   defp generate_level_params(0, 0), do: {15, 0, 0}
 
@@ -139,6 +143,8 @@ end
 
     %{state | leds: new_leds}
   end
+
+  defp start_pins(%{ref: nil} = state), do: state
 
   defp start_pins(%{ref: ref, addr: addr} = state) do
     case @i2c_handler.write(ref, addr, <<0x00, 0x0F>>) do
