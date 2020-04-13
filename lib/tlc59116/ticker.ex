@@ -17,7 +17,7 @@ defmodule Tlc59116.Ticker do
   @interval 100
   @two_hours 1000 * 60 * 60 * 2
   @three_hours 1000 * 60 * 60 * 3
-  @modes [:normal, :sparkle]
+  @modes LedString.modes()
 
   def start_link(_vars) do
     GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
@@ -74,6 +74,11 @@ defmodule Tlc59116.Ticker do
 
   defp handle_tick(%{mode: :sparkle} = state) do
     LedString.twinkle()
+    state
+  end
+
+  defp handle_tick(%{mode: :cylon} = state) do
+    LedString.cylon()
     state
   end
 

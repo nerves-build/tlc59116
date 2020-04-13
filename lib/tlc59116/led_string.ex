@@ -15,7 +15,7 @@ defmodule Tlc59116.LedString do
 
   @i2c_handler Application.get_env(:tlc59116, Tlc59116, [])
                |> Keyword.get(:i2c_handler, Circuits.I2C)
-  @actions [:normal, :sparkle]
+  @modes [:normal, :sparkle, :cylon]
 
   def start_link(_vars) do
     GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
@@ -27,6 +27,14 @@ defmodule Tlc59116.LedString do
 
   def twinkle() do
     GenServer.call(__MODULE__, :twinkle)
+  end
+
+  def modes do
+    @modes
+  end
+
+  def cylon() do
+    GenServer.call(__MODULE__, :cylon)
   end
 
   def init(state) do
@@ -47,8 +55,21 @@ defmodule Tlc59116.LedString do
     {:ok, new_state}
   end
 
-  def handle_call(action, _from, %{initialized: false} = state) when action in @actions do
+  def handle_call(action, _from, %{initialized: false} = state) when action in @modes do
     {:reply, state, state}
+  end
+
+  def handle_call(:cylon, _from, %{start_time: start_time} = state) do
+    elapsed_tenths = Kernel.trunc((:os.system_time(:millisecond) - start_time) / 100) |> rem(18)
+
+    new_leds =
+      elapsed_tenths
+      |> generate_cylon()
+      |> generate_on_lite
+
+    new_state = draw_all(state, new_leds)
+
+    {:reply, new_state, new_state}
   end
 
   def handle_call(:twinkle, _from, %{start_time: start_time} = state) do
@@ -175,4 +196,24 @@ defmodule Tlc59116.LedString do
   defp should_be_on(false, i), do: Integer.is_even(i)
 
   defp generate_on_lite(leds), do: Enum.concat(leds, [255])
+
+  defp generate_cylon(0), do: [30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(1), do: [0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(2), do: [0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(3), do: [0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(4), do: [0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0]
+  defp generate_cylon(5), do: [0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0]
+  defp generate_cylon(6), do: [0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0]
+  defp generate_cylon(7), do: [0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0]
+  defp generate_cylon(8), do: [0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0]
+  defp generate_cylon(9), do: [0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30]
+  defp generate_cylon(10), do: [0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0]
+  defp generate_cylon(11), do: [0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0]
+  defp generate_cylon(12), do: [0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0]
+  defp generate_cylon(13), do: [0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0]
+  defp generate_cylon(14), do: [0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0]
+  defp generate_cylon(15), do: [0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(16), do: [0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(17), do: [0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0]
+
 end
