@@ -122,6 +122,8 @@ defmodule Tlc59116.LedString do
     end
   end
 
+  defp handle_draw_value(%{initialized: false} = state, _value, _fade), do: state
+
   defp handle_draw_value(state, value, fade) do
     new_leds =
       value
@@ -178,7 +180,7 @@ defmodule Tlc59116.LedString do
 
       error ->
         Logger.error("Could not write LedString to #{inspect(error)}")
-        %{state | state: :disabled}
+        state
     end
   end
 
@@ -197,23 +199,22 @@ defmodule Tlc59116.LedString do
 
   defp generate_on_lite(leds), do: Enum.concat(leds, [255])
 
-  defp generate_cylon(0), do: [30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  defp generate_cylon(1), do: [0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0]
-  defp generate_cylon(2), do: [0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0]
-  defp generate_cylon(3), do: [0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0]
-  defp generate_cylon(4), do: [0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0]
-  defp generate_cylon(5), do: [0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0]
-  defp generate_cylon(6), do: [0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0]
-  defp generate_cylon(7), do: [0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0]
-  defp generate_cylon(8), do: [0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0]
-  defp generate_cylon(9), do: [0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30]
-  defp generate_cylon(10), do: [0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0]
-  defp generate_cylon(11), do: [0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0]
-  defp generate_cylon(12), do: [0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0]
-  defp generate_cylon(13), do: [0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0]
-  defp generate_cylon(14), do: [0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0]
-  defp generate_cylon(15), do: [0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0]
-  defp generate_cylon(16), do: [0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0]
-  defp generate_cylon(17), do: [0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0]
-
+  defp generate_cylon(0), do: [30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(1), do: [0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(2), do: [0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(3), do: [0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(4), do: [0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(5), do: [0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0]
+  defp generate_cylon(6), do: [0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0]
+  defp generate_cylon(7), do: [0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0]
+  defp generate_cylon(8), do: [0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0]
+  defp generate_cylon(9), do: [0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 30]
+  defp generate_cylon(10), do: [0, 0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0]
+  defp generate_cylon(11), do: [0, 0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0]
+  defp generate_cylon(12), do: [0, 0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0]
+  defp generate_cylon(13), do: [0, 0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0]
+  defp generate_cylon(14), do: [0, 0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(15), do: [0, 0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(16), do: [0, 0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0]
+  defp generate_cylon(17), do: [0, 30, 100, 220, 100, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 end
