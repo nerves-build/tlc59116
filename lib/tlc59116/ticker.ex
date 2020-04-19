@@ -73,7 +73,7 @@ defmodule Tlc59116.Ticker do
   end
 
   defp handle_tick(%{mode: :sparkle} = state) do
-    LedString.twinkle()
+    LedString.sparkle()
     state
   end
 

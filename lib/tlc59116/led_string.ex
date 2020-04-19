@@ -16,21 +16,25 @@ defmodule Tlc59116.LedString do
   @i2c_handler Application.get_env(:tlc59116, Tlc59116, [])
                |> Keyword.get(:i2c_handler, Circuits.I2C)
   @modes [:normal, :sparkle, :cylon]
+  @leds 15
+  @increment 100 / @leds
+  @all_off [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  @all_on [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 
   def start_link(_vars) do
     GenServer.start_link(__MODULE__, %State{}, name: __MODULE__)
+  end
+
+  def modes do
+    @modes
   end
 
   def draw_value(value, fade) do
     GenServer.call(__MODULE__, {:draw_value, value, fade})
   end
 
-  def twinkle() do
-    GenServer.call(__MODULE__, :twinkle)
-  end
-
-  def modes do
-    @modes
+  def sparkle() do
+    GenServer.call(__MODULE__, :sparkle)
   end
 
   def cylon() do
@@ -49,7 +53,7 @@ defmodule Tlc59116.LedString do
           %{state | addr: addr}
           |> open_handler()
           |> start_pins()
-          |> handle_draw_value(0, 100)
+          |> draw_all(generate_on_lite(@all_off))
       end
 
     {:ok, new_state}
@@ -60,10 +64,9 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call(:cylon, _from, %{start_time: start_time} = state) do
-    elapsed_tenths = Kernel.trunc((:os.system_time(:millisecond) - start_time) / 100) |> rem(18)
-
     new_leds =
-      elapsed_tenths
+      start_time
+      |> randomizer(:cylon)
       |> generate_cylon()
       |> generate_on_lite
 
@@ -72,13 +75,11 @@ defmodule Tlc59116.LedString do
     {:reply, new_state, new_state}
   end
 
-  def handle_call(:twinkle, _from, %{start_time: start_time} = state) do
-    elapsed_tenths = Kernel.trunc((:os.system_time(:millisecond) - start_time) / 500)
-
+  def handle_call(:sparkle, _from, %{start_time: start_time} = state) do
     new_leds =
-      elapsed_tenths
-      |> Integer.is_odd()
-      |> generate_twinkle()
+      start_time
+      |> randomizer(:sparkle)
+      |> generate_sparkle()
       |> generate_on_lite
 
     new_state = draw_all(state, new_leds)
@@ -87,7 +88,12 @@ defmodule Tlc59116.LedString do
   end
 
   def handle_call({:draw_value, value, fade}, _from, state) do
-    new_state = handle_draw_value(state, value, fade)
+    new_leds =
+      value
+      |> generate_level(fade)
+      |> generate_on_lite
+
+    new_state = draw_all(state, new_leds)
 
     {:reply, new_state, new_state}
   end
@@ -105,50 +111,6 @@ defmodule Tlc59116.LedString do
         Logger.error("Could not start LedString #{inspect(error)}")
         state
     end
-  end
-
-  defp generate_level({pins, val, rem}) do
-    for i <- 0..14 do
-      cond do
-        i < pins ->
-          val
-
-        i > pins ->
-          0
-
-        true ->
-          rem
-      end
-    end
-  end
-
-  defp handle_draw_value(%{initialized: false} = state, _value, _fade), do: state
-
-  defp handle_draw_value(state, value, fade) do
-    new_leds =
-      value
-      |> generate_level_params(fade)
-      |> generate_level
-      |> generate_on_lite
-
-    draw_all(state, new_leds)
-  end
-
-  defp generate_level_params(0, 0), do: {15, 0, 0}
-
-  defp generate_level_params(value, 0) do
-    inc = 100 / 15
-    pins = Kernel.floor(value / inc)
-    {pins, 0, 20}
-  end
-
-  defp generate_level_params(value, fade) do
-    inc = 100 / 15
-    pins = Kernel.floor(value / inc)
-    rem = (value - pins * inc) / inc * 255
-    val = Kernel.trunc(255 * (fade / 100.0))
-
-    {pins, val, Kernel.floor(rem)}
   end
 
   defp draw_all(%{ref: ref, addr: addr, leds: leds} = state, new_leds) do
@@ -184,7 +146,33 @@ defmodule Tlc59116.LedString do
     end
   end
 
-  defp generate_twinkle(start_on) do
+  defp generate_level(0, 0), do: @all_off
+
+  defp generate_level(value, 0) do
+    @all_off
+    |> List.insert_at(Kernel.floor(value / @increment), 20)
+    |> Enum.take(@leds)
+  end
+
+  defp generate_level(value, fade) do
+    pins = Kernel.floor(value / @increment)
+
+    rem =
+      ((value - pins * @increment) / @increment * 255)
+      |> Kernel.floor()
+
+    on_leds =
+      @all_on
+      |> Enum.take(Kernel.floor(value / @increment))
+      |> Enum.map(fn i -> Kernel.trunc(i * (fade / 100.0)) end)
+      |> Enum.concat([rem])
+
+    remainder = Enum.take(@all_off, @leds - Enum.count(on_leds))
+
+    Enum.concat(on_leds, remainder)
+  end
+
+  defp generate_sparkle(start_on) do
     for i <- 0..14 do
       if should_be_on(start_on, i) do
         255
@@ -192,6 +180,15 @@ defmodule Tlc59116.LedString do
         0
       end
     end
+  end
+
+  defp randomizer(start_time, :sparkle) do
+    Kernel.trunc((:os.system_time(:millisecond) - start_time) / 500)
+    |> Integer.is_odd()
+  end
+
+  defp randomizer(start_time, :cylon) do
+    Kernel.trunc((:os.system_time(:millisecond) - start_time) / 100) |> rem(18)
   end
 
   defp should_be_on(true, i), do: Integer.is_odd(i)
