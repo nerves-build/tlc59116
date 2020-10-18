@@ -27,6 +27,11 @@ defmodule Tlc59116.Ticker do
     GenServer.call(__MODULE__, :get_state)
   end
 
+  def set_value(new_val) when is_binary(new_val) do
+    new_val = String.to_integer(new_val)
+    GenServer.call(__MODULE__, {:set_value, new_val})
+  end
+
   def set_value(new_val) do
     GenServer.call(__MODULE__, {:set_value, new_val})
   end
@@ -43,6 +48,7 @@ defmodule Tlc59116.Ticker do
       state
       | fade_start: Keyword.get(opts, :fade_start, @two_hours),
         fade_end: Keyword.get(opts, :fade_end, @three_hours),
+        last_event: :os.system_time(:millisecond),
         start_time: :os.system_time(:millisecond)
     }
 
